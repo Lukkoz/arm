@@ -1,0 +1,298 @@
+{
+    "Name": "ARM",
+    "Settings": {
+        "Set_robot_name": [
+            "ARM",
+            ""
+        ],
+        "Set_number_of_joints": [
+            "3",
+            ""
+        ],
+        "Set_extra_joint": [
+            1,
+            ""
+        ],
+        "Set_motor_type": [
+            [
+                "1",
+                "1",
+                "1"
+            ],
+            ""
+        ],
+        "Set_servo_pin": [
+            [
+                "0",
+                "1",
+                "2"
+            ],
+            ""
+        ],
+        "Set_servo_pulse": [
+            [
+                "2500",
+                "500",
+                "180",
+                "2500",
+                "500",
+                "180",
+                "2500",
+                "500",
+                "180"
+            ],
+            ""
+        ],
+        "Set_servo_position": [
+            [
+                "90",
+                "90",
+                "90"
+            ],
+            ""
+        ],
+        "Set_motor_pin": [
+            [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+            ],
+            ""
+        ],
+        "Set_ena_pin": [
+            [
+                0,
+                0,
+                0
+            ],
+            ""
+        ],
+        "Set_switch_pin": [
+            [
+                0,
+                0,
+                0
+            ],
+            ""
+        ],
+        "Set_lim_pos": [
+            [
+                0,
+                0,
+                0
+            ],
+            ""
+        ],
+        "Set_step_deg": [
+            [
+                0,
+                0,
+                0
+            ],
+            ""
+        ],
+        "Set_dir_joints": [
+            [
+                "0",
+                "0",
+                "0"
+            ],
+            ""
+        ],
+        "Set_max_pos": [
+            [
+                "-90",
+                "90",
+                "-60",
+                "95",
+                "-90",
+                "60"
+            ],
+            ""
+        ],
+        "Set_speed": [
+            [
+                "100",
+                "1000",
+                "100",
+                "1000",
+                "100",
+                "1000"
+            ],
+            ""
+        ],
+        "Set_home_settings": [
+            [
+                "1",
+                "0",
+                "2",
+                "0",
+                "3",
+                "0"
+            ],
+            ""
+        ],
+        "Set_dh_par": [
+            [
+                [
+                    "0",
+                    "90",
+                    "114.1",
+                    "0"
+                ],
+                [
+                    "90",
+                    "0",
+                    "0",
+                    "148"
+                ],
+                [
+                    "-90",
+                    "0",
+                    "0",
+                    "113.62"
+                ],
+                [
+                    "0",
+                    "0",
+                    "0",
+                    "98.78"
+                ]
+            ],
+            ""
+        ],
+        "Set_tools": [
+            [
+                "4",
+                "0",
+                "0",
+                "0",
+                "0"
+            ],
+            ""
+        ],
+        "Set_io_pin": [
+            [
+                "27",
+                "16",
+                "4",
+                "2",
+                "0",
+                "0",
+                "0",
+                "0",
+                "0",
+                "0"
+            ],
+            ""
+        ]
+    },
+    "3Dfiles": [
+        [
+            "base.stl",
+            "/Robot_library/ARM/ROBOT_STL/ORIGINAL_base.stl",
+            "/Robot_library/ARM/ROBOT_STL/base.stl",
+            "red",
+            [
+                -60.0,
+                -69.56,
+                0.0,
+                0.0,
+                0.0,
+                -180.0
+            ],
+            "Base"
+        ],
+        [
+            "link1.stl",
+            "/Robot_library/ARM/ROBOT_STL/ORIGINAL_link1.stl",
+            "/Robot_library/ARM/ROBOT_STL/link1.stl",
+            "red",
+            [
+                -60.0,
+                -32.1,
+                -69.01,
+                -90.0,
+                0.0,
+                -180.0
+            ],
+            "Link 1"
+        ],
+        [
+            "link2.stl",
+            "/Robot_library/ARM/ROBOT_STL/ORIGINAL_link2.stl",
+            "/Robot_library/ARM/ROBOT_STL/link2.stl",
+            "red",
+            [
+                -163.11,
+                -15.12,
+                -56.0,
+                90.0,
+                -0.077,
+                0.0
+            ],
+            "Link 2"
+        ],
+        [
+            "link3.stl",
+            "/Robot_library/ARM/ROBOT_STL/ORIGINAL_link3.stl",
+            "/Robot_library/ARM/ROBOT_STL/link3.stl",
+            "red",
+            [
+                -133.51,
+                -20.44,
+                -35.0,
+                -90.0,
+                27.806,
+                180.0
+            ],
+            "Link 3"
+        ]
+    ],
+    "Tools": [
+        [
+            "gripper",
+            "/Robot_library/ARM/TOOLS_STL/ORIGINAL_gripper.stl",
+            "/Robot_library/ARM/TOOLS_STL/gripper.stl",
+            "red",
+            [
+                -105.78,
+                -19.45,
+                -37.0,
+                -90.0,
+                0.0,
+                -180.0
+            ],
+            [
+                0.0,
+                0.55,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Tool pin 1",
+            "Servo",
+            [
+                40.0,
+                120.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "0",
+            [
+                "0",
+                "0",
+                "0",
+                "0"
+            ]
+        ]
+    ],
+    "IOSettings": "IOSettings"
+}
