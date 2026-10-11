@@ -3,8 +3,9 @@
 This folder is MiKoBots Studio V1.15 adapted for the ARM robot in this repository
 (XIAO ESP32-S3 + PCA9685, firmware in the repository root).
 
+- **Installing the app:** [INSTALL.md](INSTALL.md), for everyone who gets the installer.
 - **Programming the robot:** see [PROGRAMMING.md](PROGRAMMING.md) for all Python commands,
-  Blockly blocks and firmware commands.
+  Blockly blocks and firmware commands ([Polish version](PROGRAMMING.pl.md)).
 - **Changes from the original:** the ARM is the only robot, wrist roll and wrist pitch
   (`robot.WristRoll`, `robot.WristPitch`, Blockly blocks, Roll / Pitch jog rows), the simulation
   shows both, a servo test as the example program, Blockly library included, and several fixes

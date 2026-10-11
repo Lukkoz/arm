@@ -1,7 +1,8 @@
 # Programming the ARM in MiKoBots Studio
 
 The program field can hold a **Python** program or a **Blockly** program (tick *Blockly* to switch).
-Both drive the robot when it is connected, or the simulation when *Simulation* is on.
+**Send to robot** runs it on the connected robot; with *Enable simulation* ticked,
+**Run simulation** runs it on the 3D model.
 
 ## The ARM
 
