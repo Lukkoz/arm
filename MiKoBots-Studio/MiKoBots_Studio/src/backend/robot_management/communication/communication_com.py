@@ -1,0 +1,381 @@
+import threading
+import time
+import serial
+import backend.core.variables as var
+from backend.core.event_manager import event_manager
+from backend.core.gui_bridge import publish_gui
+
+from gui.windows.message_boxes import ErrorMessage
+
+# seconds without any line from the robot before a command is given up
+RESPONSE_TIMEOUT = 10
+
+class TalkThroughCOM():
+    pause_event = threading.Event()
+
+    def __init__(self, ROBOT = False, IO = False):
+        super().__init__()
+
+        self.ROBOT = ROBOT
+        self.IO = IO
+
+        self.connect = False
+        self.com_port = None
+        self.com_ser = None
+
+        self.stop = False
+        self.pauze = False
+        self.busy = False
+        self.robot_home = False
+        self.last_rx = 0.0  # time of the last line received from the robot
+        self.end_count = 0  # number of END replies received
+
+        self.pause_event.clear()
+
+        self.settings = None
+
+# Connect the robot
+    def Connect(self, com_port = None, settings = None):
+        try:        
+            self.com_port = com_port
+            self.com_ser = serial.Serial(self.com_port, baudrate=57600)#, timeout=1)
+            self.com_ser .dtr = False   # Ensure DTR is inactive
+            self.com_ser .setRTS(False) # Deactivate RTS first
+            time.sleep(0.2)
+            self.com_ser .setRTS(True)  # Reactivate RTS to reset
+            time.sleep(0.8)
+            self.com_ser .dtr = True    # Enable DTR
+
+            t_threadRead = threading.Thread(target=self.ReadDate)
+            t_threadRead.start()
+
+            # a board that resets when the port opens announces itself at boot;
+            # one that does not reset (or boots slowly) is asked with CONNECT
+            self.WaitFor(lambda: self.connect, 2)
+            if not self.connect:
+                ends = self.end_count
+                self.com_ser.write("CONNECT\n".encode())
+                self.WaitFor(lambda: self.connect, 3)
+                # let the END of CONNECT arrive, so it cannot release the first setting early
+                self.WaitFor(lambda: self.end_count > ends, 1)
+                self.busy = False
+
+            if self.connect: 
+                self.settings = settings
+                if self.ROBOT:
+                    publish_gui("request_robot_connect_button_color", True)
+                    self.SendToolFrame()
+                    self.SendSettingsRobot()
+                
+                if self.IO:
+                    print("Send IO settings")
+                    publish_gui("request_io_connect_button_color", True)
+                    self.SendSettingsIO()
+
+                self.connect = True
+            else:
+                print(var.LANGUAGE_DATA.get("message_failed_connection_com"))
+                self.com_ser.close()
+                self.connect = False
+        
+        except serial.SerialException:
+            print(var.LANGUAGE_DATA.get("message_failed_connection_com"))
+        
+# disconnect the robot
+    def DisConnect(self):
+        self.robot_home = False  
+        try:
+            self.com_ser.close()
+        except: pass
+        self.connect = False 
+        self.busy = False
+
+        if self.ROBOT:
+            publish_gui("request_robot_connect_button_color", False)
+            publish_gui("request_robot_home_button_color", False)
+            self.robot_home = False
+
+        if self.IO:
+            publish_gui("request_io_connect_button_color", False) 
+
+# Close the robot 
+    def Close(self):
+        if self.connect:
+            self.com_ser.close()
+
+# read data
+    def ReadDate(self):
+        while self.com_ser.is_open:
+            try:
+                data = self.com_ser.readline().decode('latin-1').rstrip()  # Read a line
+            except:
+                break
+
+            if data:
+                self.last_rx = time.time()
+                if data == "BUSY":
+                    pass  # keep-alive while the robot moves, only refreshes last_rx
+                elif data == "wait":
+                    self.pause_event.set()
+                elif data.strip() == "go":
+                    self.pause_event.clear()
+                    
+                elif data.strip() == "ROBOT_CONNECTED" and self.ROBOT:
+                    self.connect = True
+                    self.busy = False
+                elif data.strip() == "ROBOT_CONNECTED" and self.IO:
+                    self.DisConnect()
+                    print(var.LANGUAGE_DATA.get("message_robot_instead_of_io"))
+                    
+                elif data.strip() == "IO_CONNECTED" and self.IO:
+                    print("IO connefcted")
+                    self.connect = True
+                    self.busy = False
+                elif data.strip() == "IO_CONNECTED" and self.ROBOT:
+                    self.DisConnect()
+                    print(var.LANGUAGE_DATA.get("message_robot_instead_of_io"))
+
+                elif data.strip() == "home":
+                    self.robot_home = True
+                    publish_gui("request_robot_home_button_color", True)
+                elif data.strip() == "END":
+                    self.end_count += 1
+                    self.busy = 0
+                elif data.startswith("Tool state"):
+                    state = data.split()[-1]
+                    if state == "HIGH":
+                        publish_gui("request_set_tool_state", True)
+                    elif state == "LOW":
+                        publish_gui("request_set_tool_state", False)
+                    
+                elif data.startswith("Input "):
+                    parts = data.split()
+                    
+                    io_number = int(parts[1])
+                    io_state = int(parts[2])
+                    
+                    if io_state == 1:
+                        publish_gui("request_set_io_state_input", io_number, True)
+                    else:
+                        publish_gui("request_set_io_state_input", io_number, False)    
+                elif data.startswith("POS:"):
+                    words = data.split()
+
+                    for i in range(len(words) - 1):
+                        if words[i] == 'G':
+                            var.TOOL_POS = float(words[i + 1])
+
+                        for j in range(var.NUMBER_OF_JOINTS):
+                            if words[i] == var.NAME_JOINTS[j]:
+                                var.POS_JOINT[j] = float(words[i + 1])
+
+                            if words[i] == var.NAME_AXIS[j]:
+                                var.POS_AXIS[j] = float(words[i + 1])
+
+                    # update the GUI once per position line
+                    publish_gui("request_set_tool_pos", var.TOOL_POS)
+                    publish_gui("request_label_pos_joint", list(var.POS_JOINT), var.NAME_JOINTS, var.UNIT_JOINT)
+                    publish_gui("request_label_pos_axis", list(var.POS_AXIS), var.NAME_AXIS, var.UNIT_AXIS)
+
+                elif not self.connect:
+                    pass  # boot log of the controller (e.g. the ESP32 ROM) before the handshake
+                else:
+
+                    data_text = "ROBOT: " + data
+                    print(data_text)
+                        
+                data = None
+
+
+            time.sleep(0.01)
+           
+        self.DisConnect()  
+
+# send command   
+    def SendLineCommand(self, command):
+        while self.pause_event.is_set():
+            time.sleep(0.1)
+        
+        self.busy = 1   
+        try:
+            # print(command)
+            self.com_ser.write(command.encode())
+        except:
+            self.DisConnect()
+            print(var.LANGUAGE_DATA.get("message_lost_connection_robot"))
+            
+        # wait for END; the timeout restarts with every line the robot sends ("BUSY" during long moves)
+        start_time = time.time()
+        while self.busy:
+            if time.time() - max(start_time, self.last_rx) >= RESPONSE_TIMEOUT:
+                print(f"Warning: no answer from the robot for {RESPONSE_TIMEOUT} s, "
+                      f"continuing without END for: {command.strip()}")
+                self.busy = 0
+                break
+            time.sleep(0.03)
+
+    @staticmethod
+    def WaitFor(condition, timeout):
+        start_time = time.time()
+        while not condition() and time.time() - start_time < timeout:
+            time.sleep(0.01)
+
+# send settings  
+    def SendSettingsRobot(self):
+        if not self.busy and self.connect:
+            category_names = []
+
+            def make_line_ABC(settings_values, command_name):
+                letters = [chr(i) for i in range(65, 91)] + [chr(i) for i in range(97, 123)]
+
+                if isinstance(settings_values[0], list):
+                    column = len(settings_values)
+                else:
+                    column = 1
+                    
+                    
+                formatted_settings = f"{command_name} "
+                if column == 1:
+                    for i, value in enumerate(settings_values):
+                        formatted_settings += letters[i] + str(value)
+                else:
+                    for i in range(column):
+                        for j in range(len(settings_values[0])):
+                            value = settings_values[i][j]
+                            formatted_settings += letters[j + (len(settings_values[0])) * i] + str(value)
+                
+                formatted_settings += "\n"
+                return formatted_settings
+            
+            def threadSettings():
+                # send all the settings to the robot except for the settings where the IO_box is checked
+                robot_settings = var.ROBOT_SETTINGS
+                
+                print(robot_settings)
+
+                # sent first the number of joints
+                command = f'Set_number_of_joints A{var.NUMBER_OF_JOINTS}\n'
+                self.SendLineCommand(command)
+                
+                settings = robot_settings['Set_motor_type']
+                command = make_line_ABC(settings[0], 'Set_motor_type')
+                self.SendLineCommand(command)
+                
+                if var.EXTRA_JOINT:
+                    command = f'Set_extra_joint A1\n'
+                    self.SendLineCommand(command) 
+                    
+                           
+                for category in robot_settings:
+                    settings = robot_settings[category]
+                    if settings[1] == "" and  category != 'Set_extra_joint' and category != 'Set_motor_type'  and  category != 'Set_io_pin'and  category != 'Set_robot_name' and  category != "Set_tools":
+                        
+                        command = make_line_ABC(settings[0], category)
+                        self.SendLineCommand(command)
+                                  
+            t_threadSettings = threading.Thread(target=threadSettings)  
+            t_threadSettings.start()         
+            
+            
+        else:
+            if self.busy == 1:
+                print(var.LANGUAGE_DATA.get("message_robot_busy")) 
+            elif not self.connect:
+                print(var.LANGUAGE_DATA.get("message_robot_not_connected")) 
+                ErrorMessage(var.LANGUAGE_DATA.get("message_robot_not_connected"))
+    
+    def SendSettingsIO(self):
+        if not self.busy and self.connect:
+            category_names = []
+
+            def make_line_ABC(settings_values, command_name):
+                letters = [chr(i) for i in range(65, 91)]  # A-Z letters
+
+                if isinstance(settings_values[0], list):
+                    column = len(settings_values)
+                else:
+                    column = 1
+                formatted_settings = f"{command_name} "
+                if column == 1:
+                    for i, value in enumerate(settings_values):
+                        formatted_settings += letters[i] + str(value)
+                else:
+                    for i in range(column):
+                        for j in range(len(settings_values[0])):
+                            value = settings_values[i][j]
+                            formatted_settings += letters[j + (len(settings_values[0])) * i] + str(value)
+                
+                formatted_settings += "\n"
+                return formatted_settings
+            
+            def threadSettings():
+                robot_settings = var.ROBOT_SETTINGS
+
+                # send all the settings to the robot except for the settings where the IO_box is checked
+                for category in robot_settings:
+                    category_names.append(category)
+                    
+                for i, setting in enumerate(robot_settings):
+                    settings = robot_settings[category_names[i]]
+                    if settings[1] == "IO":
+                        command = make_line_ABC(settings[0], category_names[i])
+                        
+                        self.SendLineCommand(command)
+                          
+                
+            t_threadSettings = threading.Thread(target=threadSettings)  
+            t_threadSettings.start()         
+            
+            
+        else:
+            if self.busy == 1:
+                print(var.LANGUAGE_DATA.get("message_io_busy"))
+                ErrorMessage(var.LANGUAGE_DATA.get("message_io_busy"))
+            elif self.connect == 0:
+                print(var.LANGUAGE_DATA.get("message_io_not_connected"))
+                ErrorMessage(var.LANGUAGE_DATA.get("message_io_not_connected"))
+
+    def SendToolFrame(self):
+        if not self.busy and self.connect:
+            tool_frame = var.TOOL_FRAME
+            command = "Set_tool_frame "
+            letters = ['A','B','C','D','E','F']
+            
+
+            for i in range(6):
+                command += str(letters[i])
+                command += str(tool_frame[i])
+                
+            command += "\n"
+                
+            self.SendLineCommand(command)
+
+
+## play pauze stop the robot
+    def StopProgram(self):
+        # send all the settings to the robot except for the settings where the IO_box is checked
+        command = "stop\n"
+        if self.com_ser:
+            self.com_ser.write(command.encode())
+
+        self.busy = False
+        self.stop = True
+
+    def PlayProgram(self):
+        # send all the settings to the robot except for the settings where the IO_box is checked
+        command = "play\n"
+        if self.com_ser:
+            self.com_ser.write(command.encode())
+
+        self.stop = False
+        self.pauze = False
+
+    def PauzeProgram(self):
+        # send all the settings to the robot except for the settings where the IO_box is checked
+        command = "pauze\n"
+        if self.com_ser:
+            self.com_ser.write(command.encode())
+
+        self.pauze = True
+
+
