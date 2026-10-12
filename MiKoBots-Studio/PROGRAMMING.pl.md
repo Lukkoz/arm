@@ -1,8 +1,10 @@
 # Programowanie ramienia ARM w MiKoBots Studio
 
-Pole programu może zawierać program w **Pythonie** albo w **Blockly** (przełącza się je polem
-*Blockly*). **Send to robot** uruchamia program na podłączonym robocie; przy zaznaczonym
-*Enable simulation* przycisk **Run simulation** uruchamia go na modelu 3D.
+Pole programu ma trzy rodzaje programów, wybierane z listy nad nim: **Python**, **Blockly**
+oraz **Text (Kawasaki AS / G-code)**. Python i Text zachowują swój tekst przy przełączaniu.
+Zielony przycisk **Run** obok listy uruchamia program na robocie albo na modelu 3D, zależnie od
+przełącznika **ROBOT / SIMULATION** w sekcji *Mode*; podczas działania programu przycisk robi
+się czerwony i zatrzymuje program.
 
 ## Ramię ARM
 
@@ -115,11 +117,87 @@ ARM używa bloków z kategorii **Robot 3 axis**. Bloki dla 5 i 6 osi na nim nie 
 Blockly nie ma bloku dla `Home`, `MoveJointPos` ani `JogJoint`: przed uruchomieniem programu
 Blockly z MoveJ / MoveL / Offset wykonaj bazowanie przyciskiem *Home*.
 
+## Programy tekstowe (Kawasaki AS / G-code)
+
+Wybierz **Text (Kawasaki AS / G-code)** z listy i wpisz program jako zwykły tekst. Aplikacja
+najpierw sprawdza cały program: jeśli któraś linia ma błąd, dziennik pokazuje wszystkie błędy
+z numerami linii i robot się nie porusza. Podczas wykonywania dziennik pokazuje każdą linię.
+
+- Linie Kawasaki AS i G-code można mieszać; każda linia jest czytana osobno. Wielkość liter
+  nie ma znaczenia.
+- Komentarze: `;` do końca linii oraz `( … )` w liniach G-code.
+- Jednostki: mm, stopnie, sekundy; prędkość i przyspieszenie w %.
+- Programy tekstowe poruszają tylko J1–J3 oraz X Y Z; obrót (roll) i pochylenie (pitch)
+  nadgarstka zostają bez zmian.
+- Przed ruchami do pozycji wykonaj bazowanie (`HOME` / `G28` albo przycisk *Home*), tak jak
+  w Pythonie.
+
+### Kawasaki AS
+
+| Polecenie | Działanie |
+|---|---|
+| `HOME` | bazowanie robota (w symulacji: przeguby na 0) |
+| `JMOVE poza` | ruch do pozy, każdy przegub po swojej drodze |
+| `LMOVE poza` | ruch do pozy kartezjańskiej po linii prostej |
+| `DRAW dx, dy, dz` | ruch o dx dy dz od obecnej pozycji narzędzia, po linii prostej |
+| `SPEED n` (`SPEED n ALWAYS`) | prędkość w % dla kolejnych ruchów (domyślnie 50) |
+| `ACCEL n` / `DECEL n` | przyspieszenie w % dla kolejnych ruchów (jedna wartość dla obu) |
+| `TWAIT t` | czekaj t sekund |
+| `OPENI` / `CLOSEI` (albo `OPEN` / `CLOSE`) | otwórz / zamknij chwytak |
+| `SIGNAL n` / `SIGNAL -n` | włącz / wyłącz wyjście n |
+| `POINT nazwa = TRANS(x, y, z)` | nazwana poza kartezjańska |
+| `POINT #nazwa = #PPOINT(j1, j2, j3)` | nazwana poza przegubowa (kąty w stopniach) |
+| `.PROGRAM nazwa()` … `.END` | ramka programu, można ją pominąć |
+
+Poza to `TRANS(x, y, z)`, `#PPOINT(j1, j2, j3)` albo nazwa zdefiniowana przez `POINT`.
+`TRANS(x, y, z, o, a, t)` jest akceptowane, ale O A T są pomijane (ostrzeżenie w dzienniku).
+Nieobsługiwane: `IF`, `FOR`, `WHILE`, `GOTO`, etykiety, `SWAIT`, `TDRAW`, `HERE`.
+
+### G-code
+
+| Kod | Działanie |
+|---|---|
+| `G0 X Y Z` | ruch, każdy przegub po swojej drodze |
+| `G1 X Y Z F` | ruch po linii prostej |
+| `G4 P<ms>` / `G4 S<s>` | czekanie |
+| `G28` | bazowanie |
+| `G90` / `G91` | współrzędne bezwzględne (domyślnie) / względne dla kolejnych ruchów |
+| `G21` | milimetry (domyślnie) |
+| `F<mm/min>` | prędkość: 9000 mm/min = 100 % (150 mm/s); obowiązuje dla kolejnych ruchów |
+| `M3` / `M5` | zamknij / otwórz chwytak |
+| `N…` | numer linii, pomijany |
+
+Osie pominięte w linii zachowują swoją wartość: `G1 Z50` zmienia tylko Z. Nieobsługiwane: cale
+(`G20`), łuki (`G2`, `G3`) i wszystkie inne kody.
+
+### Przykład
+
+```
+; Kawasaki AS
+HOME
+SPEED 30
+POINT pick = TRANS(200, 0, 250)
+JMOVE pick
+DRAW 0, 0, -40
+TWAIT 1
+DRAW 0, 0, 40
+; G-code
+G90
+G1 X150 Y100 Z250 F3000
+G4 P500
+G28
+```
+
 ## Panel sterowania
 
 - **Jog Joint:** `-` / `+` dla J1–J3, **Roll** i **Pitch**, o wartość kroku (jog distance).
 - **Jog Axis:** przesuwa końcówkę wzdłuż X, Y, Z (wymaga Home).
 - **Tool:** otwiera / zamyka chwytak.
+- **Mode:** duży przełącznik **ROBOT / SIMULATION** wybiera, gdzie działają programy i ręczne
+  sterowanie.
+- **Robot:** *Connect robot*, *Home*, **Pause / Resume** (zatrzymuje robota w trakcie ruchu
+  i wznawia ruch) oraz czerwony **STOP** (od razu kończy program i ruch; ręczne sterowanie,
+  Home i Run działają zaraz po nim).
 
 ## Polecenia firmware
 

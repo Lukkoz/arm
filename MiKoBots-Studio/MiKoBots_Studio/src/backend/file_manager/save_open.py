@@ -29,8 +29,8 @@ class SaveOpen:
                     "origins",
                     "Selected robot",
                     "Selected tool",
-                    "Program blockly"
-                    
+                    "Program blockly",
+                    "python"                # program type: python, blockly or text
         ]
         #self.file_dialog = QFileDialog()
         
@@ -55,7 +55,8 @@ class SaveOpen:
                 [],
                 var.ROBOT_NAME,
                 var.TOOL,
-                ""
+                "",
+                "python"
         ]
         self.SetProgram()
         event_manager.publish("request_set_program_title", "New file")
@@ -65,8 +66,7 @@ class SaveOpen:
             return
         
         self.MikoFile[6] = ""
-        self.MikoFile[0] = event_manager.publish("request_program_field_get")[0]
-        #self.MikoFile[1] = event_manager.publish("request_gcode_text_get")[0]
+        self.ReadPrograms()
         self.MikoFile[2] = get_objects_sim()
         self.MikoFile[3] = get_origins_file()
         self.MikoFile[4] = var.ROBOT_NAME
@@ -93,8 +93,7 @@ class SaveOpen:
         if check_program_run():    
             return
 
-        self.MikoFile[0] = event_manager.publish("request_program_field_get")[0]
-        #self.MikoFile[1] = event_manager.publish("request_gcode_text_get")[0]
+        self.ReadPrograms()
         self.MikoFile[2] = get_objects_sim()
         self.MikoFile[3] = get_origins_file()
         self.MikoFile[4] = var.ROBOT_NAME
@@ -165,10 +164,26 @@ class SaveOpen:
         
             
     
+    # Python program, text program (Kawasaki AS / G-code) and the selected program type
+    def ReadPrograms(self):
+        while len(self.MikoFile) < 8:          # files of older versions
+            self.MikoFile.append("python" if len(self.MikoFile) == 7 else "")
+        self.MikoFile[0] = event_manager.publish("request_program_field_get")[0]
+        self.MikoFile[1] = event_manager.publish("request_text_program_get")[0]
+        self.MikoFile[7] = event_manager.publish("request_get_program_type")[0]
+
     def SetProgram(self):
             
         # Program text
         event_manager.publish("request_program_field_insert", self.MikoFile[0])
+
+        # Text program; older files hold "" or the placeholder "Gcode" here
+        text = self.MikoFile[1] if isinstance(self.MikoFile[1], str) and self.MikoFile[1] != "Gcode" else ""
+        event_manager.publish("request_text_program_set", text)
+
+        # Program type, Python for files of older versions
+        mode = self.MikoFile[7] if len(self.MikoFile) > 7 else "python"
+        event_manager.publish("request_set_program_type", mode)
         
         # Blockly program
         try:

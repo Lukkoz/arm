@@ -1,8 +1,10 @@
 # Programming the ARM in MiKoBots Studio
 
-The program field can hold a **Python** program or a **Blockly** program (tick *Blockly* to switch).
-**Send to robot** runs it on the connected robot; with *Enable simulation* ticked,
-**Run simulation** runs it on the 3D model.
+The program field has three program types, chosen in the dropdown above it: **Python**,
+**Blockly** and **Text (Kawasaki AS / G-code)**. Python and Text keep their own text when you
+switch. The green **Run** button next to the dropdown runs the program on the robot or on the
+3D model, depending on the **ROBOT / SIMULATION** toggle under *Mode*; while the program runs
+the button turns red and stops it.
 
 ## The ARM
 
@@ -115,11 +117,83 @@ The ARM uses the blocks in **Robot 3 axis**. The 5- and 6-axis blocks do not wor
 Blockly has no block for `Home`, `MoveJointPos` or `JogJoint`: home the robot with the *Home*
 button before running a Blockly program that uses MoveJ / MoveL / Offset.
 
+## Text programs (Kawasaki AS / G-code)
+
+Choose **Text (Kawasaki AS / G-code)** in the dropdown and type the program as plain text. The
+app checks the whole program first: if a line has an error, the log lists every error with
+its line number and nothing moves. While the program runs, the log shows each line.
+
+- Kawasaki AS and G-code lines can be mixed; every line is read on its own. Upper or lower case.
+- Comments: `;` to the end of the line, and `( … )` in G-code lines.
+- Units: mm, degrees, seconds; speed and acceleration in %.
+- Text programs move J1–J3 and X Y Z only; the wrist roll and pitch stay where they are.
+- Home the robot (`HOME` / `G28` or the *Home* button) before position moves, as in Python.
+
+### Kawasaki AS
+
+| Command | What it does |
+|---|---|
+| `HOME` | home the robot (in the simulation: joints to 0) |
+| `JMOVE pose` | move to a pose, every joint on its own path |
+| `LMOVE pose` | move to a Cartesian pose in a straight line |
+| `DRAW dx, dy, dz` | move by dx dy dz from where the tool is, in a straight line |
+| `SPEED n` (`SPEED n ALWAYS`) | speed in % for the following moves (default 50) |
+| `ACCEL n` / `DECEL n` | acceleration in % for the following moves (one value for both) |
+| `TWAIT t` | wait t seconds |
+| `OPENI` / `CLOSEI` (or `OPEN` / `CLOSE`) | open / close the gripper |
+| `SIGNAL n` / `SIGNAL -n` | switch output n on / off |
+| `POINT name = TRANS(x, y, z)` | name a Cartesian pose |
+| `POINT #name = #PPOINT(j1, j2, j3)` | name a joint pose (joint angles in degrees) |
+| `.PROGRAM name()` … `.END` | program frame, may be left out |
+
+A pose is `TRANS(x, y, z)`, `#PPOINT(j1, j2, j3)` or a name defined with `POINT`.
+`TRANS(x, y, z, o, a, t)` is accepted, but O A T are ignored (warning in the log).
+Not supported: `IF`, `FOR`, `WHILE`, `GOTO`, labels, `SWAIT`, `TDRAW`, `HERE`.
+
+### G-code
+
+| Code | What it does |
+|---|---|
+| `G0 X Y Z` | move, every joint on its own path |
+| `G1 X Y Z F` | move in a straight line |
+| `G4 P<ms>` / `G4 S<s>` | wait |
+| `G28` | home |
+| `G90` / `G91` | absolute (default) / relative coordinates for the following moves |
+| `G21` | millimetres (the default) |
+| `F<mm/min>` | speed: 9000 mm/min = 100 % (150 mm/s); kept for the following moves |
+| `M3` / `M5` | close / open the gripper |
+| `N…` | line number, ignored |
+
+Axes that a line leaves out keep their value: `G1 Z50` only changes Z. Not supported: inches
+(`G20`), arcs (`G2`, `G3`) and every other code.
+
+### Example
+
+```
+; Kawasaki AS
+HOME
+SPEED 30
+POINT pick = TRANS(200, 0, 250)
+JMOVE pick
+DRAW 0, 0, -40
+TWAIT 1
+DRAW 0, 0, 40
+; G-code
+G90
+G1 X150 Y100 Z250 F3000
+G4 P500
+G28
+```
+
 ## Control panel
 
 - **Jog Joint:** `-` / `+` for J1–J3, **Roll** and **Pitch**, by the jog distance.
 - **Jog Axis:** moves the tip along X, Y, Z (needs Home).
 - **Tool:** opens / closes the gripper.
+- **Mode:** the big **ROBOT / SIMULATION** toggle chooses where programs and jog buttons act.
+- **Robot:** *Connect robot*, *Home*, **Pause / Resume** (holds the robot in the middle of a
+  move and continues it) and the red **STOP** (ends the program and the move at once; jog,
+  Home and Run work again right after it).
 
 ## Firmware commands
 

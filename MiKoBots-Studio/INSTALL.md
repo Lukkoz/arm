@@ -24,6 +24,12 @@ Nothing else needs to be installed: Python and all libraries are included.
 The first start takes up to a minute: the program creates its data folder
 `Documents\MyAppData\MiKoBots` with the ARM robot and its 3D model.
 
+If the PC already had MiKoBots Studio (the folder `Documents\MyAppData\MiKoBots` exists), the
+program adds the ARM robot to it and moves the other robots to
+`Documents\MyAppData\MiKoBots\Robot_library_disabled`. Nothing is deleted. This version only
+works with the ARM: it does this check at every start, so for the other robots use the
+original MiKoBots Studio (and move their folders back into `Robot_library`).
+
 ## Connect the robot
 
 1. Switch on the servo power supply of the robot and connect the robot's USB-C cable to the PC.
@@ -41,15 +47,17 @@ before connecting.
 
 ## Try it without a robot
 
-Tick **Enable simulation**: the jog buttons then move the 3D model instead of the robot, and
-**Run simulation** runs the program in the program field on the model. **Send to robot** runs it
-on the real robot.
+Click the big **ROBOT** button under *Mode* so it shows **SIMULATION** (blue): the jog buttons
+then move the 3D model instead of the robot, and the green **Run** button next to the program
+runs the program on the model. Click it again to switch back to **ROBOT** (green).
 
 ## Programming
 
-The program field starts with a servo test that moves every joint on its own. All commands for
-Python and Blockly are described in **PROGRAMMING.md** (English) and **PROGRAMMING.pl.md**
-(Polish), next to this file in the project.
+The dropdown above the program field chooses the program type: **Python**, **Blockly** or
+**Text (Kawasaki AS / G-code)**. The Python field starts with a servo test that moves every
+joint on its own; the Text field starts with a short Kawasaki / G-code example. All commands
+are described in **PROGRAMMING.md** (English) and **PROGRAMMING.pl.md** (Polish), next to this
+file in the project.
 
 ## Update or uninstall
 

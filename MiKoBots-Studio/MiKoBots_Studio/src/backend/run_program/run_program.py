@@ -15,6 +15,7 @@ from backend.simulation import simulation_not_busy, check_simulation_on
 from backend.robot_management.communication import connect_robot_check, connect_io_check
 
 import gc
+import backend.text_program  # used by the text programs run in execute_script (and bundled by PyInstaller)
 
 class RunProgram():
     def __init__(self):
@@ -29,21 +30,10 @@ class RunProgram():
 
         
 
-    def RunScript(self, sim):     
-        if sim and check_simulation_on() and not self.program_running:
-            if event_manager.publish("request_get_program_type")[0]:
-                event_manager.publish("request_get_blockly_code")
-            else:
-                script = event_manager.publish("request_program_field_get")[0]
-                self.script_thread = threading.Thread(target=self.execute_script, args=(script,), name = "run script")
-                self.script_thread.start()          
-        elif not sim and (connect_robot_check() or connect_io_check()) and not self.program_running:
-            if event_manager.publish("request_get_program_type")[0]:
-                event_manager.publish("request_get_blockly_code")
-            else:
-                script = event_manager.publish("request_program_field_get")[0]
-                self.script_thread = threading.Thread(target=self.execute_script, args=(script,), name = "run script")
-                self.script_thread.start()            
+    def RunScript(self, sim):
+        if (sim and check_simulation_on() and not self.program_running) or \
+           (not sim and (connect_robot_check() or connect_io_check()) and not self.program_running):
+            self.StartProgram()
         else:
             if not self.program_running and not sim:
                 print(var.LANGUAGE_DATA.get("message_robot_not_connected"))
@@ -51,6 +41,20 @@ class RunProgram():
             else:
                 print(var.LANGUAGE_DATA.get("message_program_running"))
                 ErrorMessage(var.LANGUAGE_DATA.get("message_program_running"))
+
+    # program type from the program field: "python", "blockly" or "text" (Kawasaki AS / G-code)
+    def StartProgram(self):
+        program_type = event_manager.publish("request_get_program_type")[0]
+        if program_type == "blockly":
+            event_manager.publish("request_get_blockly_code")
+            return
+        if program_type == "text":
+            text = event_manager.publish("request_text_program_get")[0]
+            script = f"from backend.text_program import run_text_program\nrun_text_program({text!r})\n"
+        else:
+            script = event_manager.publish("request_program_field_get")[0]
+        self.script_thread = threading.Thread(target=self.execute_script, args=(script,), name = "run script")
+        self.script_thread.start()
 
     def RunBlocklyCode(self, code):
         try:

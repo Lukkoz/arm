@@ -640,3 +640,42 @@ style_table = ("""
         border: 1px solid #a9a9a9;
     }
 """)
+
+# Toggle in the menu: robot (unchecked) or simulation (checked)
+style_toggle_mode = ("""
+            QPushButton {
+                background-color: #2e7d32;
+                color: white;
+                border: 0px;
+                border-radius: 6px;
+                font-size: 16px;
+                font-weight: bold;
+                font-family: "Segoe UI";
+            }
+            QPushButton:checked {
+                background-color: #1565c0;
+            }
+            QPushButton:hover {
+                border: 2px solid black;
+            }
+            """)
+
+# Run button next to the program: green to run, red while a program runs (property "running")
+style_button_run = ("""
+            QPushButton {
+                background-color: #2e7d32;
+                color: white;
+                border: 0px;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: bold;
+                font-family: "Segoe UI";
+                padding: 0 8px;
+            }
+            QPushButton[running="true"] {
+                background-color: #c62828;
+            }
+            QPushButton:hover {
+                border: 2px solid black;
+            }
+            """)

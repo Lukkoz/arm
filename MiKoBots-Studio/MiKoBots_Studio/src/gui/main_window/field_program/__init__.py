@@ -1,14 +1,17 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
-from PyQt5.QtGui import QCursor, QPixmap, QSyntaxHighlighter, QTextCharFormat,  QDesktopServices, QTextCursor, QFont
-from PyQt5.QtCore import Qt, QRegularExpression, QUrl, pyqtSignal, QStringListModel, pyqtSlot
+from PyQt5.QtGui import QCursor, QPixmap, QSyntaxHighlighter, QTextCharFormat,  QDesktopServices, QTextCursor, QFont, QIcon
+from PyQt5.QtCore import Qt, QRegularExpression, QUrl, pyqtSignal, QStringListModel, pyqtSlot, QTimer
 from PyQt5.QtWidgets import QCompleter, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox, QComboBox, QSizePolicy, QApplication, QFileDialog, QFrame, QGridLayout, QTextEdit, QScrollBar, QLineEdit, QWidget
 
 from backend.core.event_manager import event_manager
 from gui.style import *
 import os
 
-from backend.run_program import run_blockly_code
+from backend.run_program import run_blockly_code, run_script, stop_script, check_program_run
+from backend.simulation import check_simulation_on
+from backend.robot_management.communication import stop_robot, leave_stop_mode
+from backend.file_managment import get_image_path
 
 from backend.file_manager import blockly_save
 
@@ -63,6 +66,29 @@ for angle in (30, -30, 0):
 print("servo test done")
 '''
 
+# Shown in the editor of the text mode: Kawasaki AS and G-code, see PROGRAMMING.md.
+EXAMPLE_TEXT_PROGRAM = '''; Text program: Kawasaki AS and G-code (mm, %, s). Home the robot first.
+; Kawasaki AS
+HOME
+SPEED 30
+POINT pick = TRANS(200, 0, 250)
+JMOVE pick
+DRAW 0, 0, -40
+TWAIT 1
+DRAW 0, 0, 40
+; G-code
+G90
+G1 X150 Y100 Z250 F3000
+G4 P500
+G28
+'''
+
+PROGRAM_MODES = [
+    ("Python", "python"),
+    ("Blockly", "blockly"),
+    ("Text (Kawasaki AS / G-code)", "text"),
+]
+
 class ProgramField(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -81,6 +107,9 @@ class ProgramField(QWidget):
         event_manager.subscribe("request_program_field_insert", self.ProgramFieldInsert)
         event_manager.subscribe("request_program_field_get", self.ProgramFieldGet)
         event_manager.subscribe("request_get_program_type", self.GetProgramTpe)
+        event_manager.subscribe("request_set_program_type", self.SetProgramMode)
+        event_manager.subscribe("request_text_program_get", self.TextProgramGet)
+        event_manager.subscribe("request_text_program_set", self.TextProgramSet)
         event_manager.subscribe("request_get_blockly_code", self.GetBlocklyCode)
         event_manager.subscribe("request_save_blockly_file", self.save_workspace)
         event_manager.subscribe("request_load_blockly_file", self.load_workspace)
@@ -95,10 +124,35 @@ class ProgramField(QWidget):
         self.PROGRAM_NAME.setFixedHeight(24)
         self.layout.addWidget(self.PROGRAM_NAME, 0, 0)
         
-        self.CHECKBOX_BLOCKLY = QCheckBox("Blockly")
-        self.CHECKBOX_BLOCKLY.setStyleSheet(style_checkbox)
-        self.layout.addWidget(self.CHECKBOX_BLOCKLY,1,0)
-        self.CHECKBOX_BLOCKLY.stateChanged.connect(lambda state: self.SwitchProgramStle(state))
+        # program type: Python and text programs share the editor, each keeps its own text
+        self.mode = "python"
+        self.texts = {"python": EXAMPLE_PROGRAM, "text": EXAMPLE_TEXT_PROGRAM}
+        self.COMBO_MODE = QComboBox()
+        self.COMBO_MODE.setStyleSheet(style_combo)
+        self.COMBO_MODE.setFixedWidth(230)
+        for label, mode in PROGRAM_MODES:
+            self.COMBO_MODE.addItem(label, mode)
+        self.COMBO_MODE.currentIndexChanged.connect(lambda index: self.SwitchProgramStle(self.COMBO_MODE.itemData(index)))
+
+        # one Run button: runs on the robot or the simulation (the Mode toggle), Stop while running
+        self.RUN_BUTTON = QPushButton()
+        self.RUN_BUTTON.setFixedHeight(30)
+        self.RUN_BUTTON.setMinimumWidth(190)
+        self.RUN_BUTTON.setStyleSheet(style_button_run)
+        self.RUN_BUTTON.clicked.connect(self.RunOrStop)
+
+        mode_row = QHBoxLayout()
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.addWidget(self.COMBO_MODE)
+        mode_row.addStretch(1)
+        mode_row.addWidget(self.RUN_BUTTON)
+        self.layout.addLayout(mode_row, 1, 0)
+
+        self.run_state = None
+        self.UpdateRunButton()
+        self.run_timer = QTimer(self)                 # follows the program and the Mode toggle
+        self.run_timer.timeout.connect(self.UpdateRunButton)
+        self.run_timer.start(200)
 
         self.h_layout = QHBoxLayout()
         self.h_layout.setContentsMargins(0, 0, 1, 2)  # Set margins to zero
@@ -217,17 +271,71 @@ class ProgramField(QWidget):
         self.PROGRAM_TEXT_WIDGET.setTextCursor(cursor)
 
  
-    def SwitchProgramStle(self, state):
-        current_directory = os.path.dirname(__file__)
-        blockly_path = os.path.abspath(os.path.join(current_directory, '../..', 'blockly', 'blockly.html'))
-        if state:
+    def SwitchProgramStle(self, mode):
+        if mode == self.mode:
+            return
+        if self.mode in self.texts:                       # keep the text of the editor mode we leave
+            self.texts[self.mode] = self.PROGRAM_TEXT_WIDGET.toPlainText()
+        self.mode = mode
+
+        if mode == "blockly":
             self.frame.hide()
             self.button_min.hide()
             self.button_plus.hide()
         else:
+            self.PROGRAM_TEXT_WIDGET.setPlainText(self.texts[mode])
             self.frame.show()
             self.button_min.show()
             self.button_plus.show()
+
+    def UpdateRunButton(self):
+        state = (check_program_run(), check_simulation_on())
+        if state == self.run_state:
+            return
+        self.run_state = state
+        running, simulation = state
+        target = "simulation" if simulation else "robot"
+        if running:
+            self.RUN_BUTTON.setText("  Stop")
+            self.RUN_BUTTON.setIcon(QIcon(get_image_path("stop.png")))
+            self.RUN_BUTTON.setToolTip("Stop the program")
+        else:
+            self.RUN_BUTTON.setText(f"  Run on {target}")
+            self.RUN_BUTTON.setIcon(QIcon(get_image_path("play.png")))
+            self.RUN_BUTTON.setToolTip(f"Run the program on the {target} (switch with the Mode toggle)")
+        self.RUN_BUTTON.setProperty("running", running)
+        self.RUN_BUTTON.style().unpolish(self.RUN_BUTTON)
+        self.RUN_BUTTON.style().polish(self.RUN_BUTTON)
+
+    def RunOrStop(self):
+        if check_program_run():
+            stop_script()
+            if not check_simulation_on():
+                stop_robot()
+                leave_stop_mode()   # like the red STOP: the next Run, jog or Home works right away
+        else:
+            run_script(check_simulation_on())
+        self.UpdateRunButton()
+
+    def SetProgramMode(self, mode):
+        index = self.COMBO_MODE.findData(mode)
+        self.COMBO_MODE.setCurrentIndex(index if index >= 0 else 0)
+
+    # the text of one editor mode, wherever it is now (in the editor or kept aside)
+    def GetModeText(self, mode):
+        return self.PROGRAM_TEXT_WIDGET.toPlainText() if self.mode == mode else self.texts[mode]
+
+    def SetModeText(self, mode, text):
+        if self.mode == mode:
+            self.PROGRAM_TEXT_WIDGET.setPlainText(text)
+        else:
+            self.texts[mode] = text
+
+    def TextProgramGet(self):
+        return self.GetModeText("text")
+
+    def TextProgramSet(self, text):
+        self.SetModeText("text", text)
 
     def update_line_numbers(self):
         # Get the number of lines in the text editor
@@ -249,24 +357,24 @@ class ProgramField(QWidget):
         # Synchronize the scrollbar values
         self.line_numbers.verticalScrollBar().setValue(self.PROGRAM_TEXT_WIDGET.verticalScrollBar().value())
     
+    # the Python program, also while another mode is shown
     def ProgramFieldClear(self):
-        self.PROGRAM_TEXT_WIDGET.clear()
-        
+        self.SetModeText("python", "")
+
     def ProgramFieldInsert(self, text):
-        self.PROGRAM_TEXT_WIDGET.insertPlainText(text)
-        
+        if self.mode == "python":
+            self.PROGRAM_TEXT_WIDGET.insertPlainText(text)
+        else:
+            self.texts["python"] += text
+
     def ProgramFieldGet(self):
-        program = self.PROGRAM_TEXT_WIDGET.toPlainText() 
-        return program
+        return self.GetModeText("python")
     
     def SetProgramName(self, name):
         self.PROGRAM_NAME.setText(f"Program: {name}")
 
     def GetProgramTpe(self):
-        if self.CHECKBOX_BLOCKLY.isChecked():
-            return True
-        else:
-            return False 
+        return self.mode            # "python", "blockly" or "text"
         
     def GetBlocklyCode(self):
         self.web_view.page().runJavaScript("python.pythonGenerator.workspaceToCode(workspace);", run_blockly_code)

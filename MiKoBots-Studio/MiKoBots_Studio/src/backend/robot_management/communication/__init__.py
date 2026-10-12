@@ -113,7 +113,20 @@ def stop_robot():
     if talk_with_robot_bt.connect:
         talk_with_robot_bt.StopProgram()
     elif talk_with_robot_com.connect:
-        talk_with_robot_com.StopProgram()  
+        talk_with_robot_com.StopProgram()
+
+def leave_stop_mode():
+    """After STOP the app accepts commands again (the firmware does so by itself: every new
+    command clears its stop, and stop also ends a pause). Nothing is sent to the robot."""
+    for talk in (talk_with_robot_bt, talk_with_robot_com):
+        talk.stop = False
+        talk.pauze = False
+        talk.pause_event.clear()
+
+def robot_paused():
+    """True while the connected robot is paused (Pause pressed, not resumed yet)."""
+    return (talk_with_robot_bt.connect and talk_with_robot_bt.pauze) or \
+           (talk_with_robot_com.connect and talk_with_robot_com.pauze)
 
 
 
