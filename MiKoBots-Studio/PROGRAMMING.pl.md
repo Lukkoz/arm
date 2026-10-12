@@ -194,7 +194,8 @@ G28
 - **Jog Axis:** przesuwa końcówkę wzdłuż X, Y, Z (wymaga Home).
 - **Tool:** otwiera / zamyka chwytak.
 - **Mode:** duży przełącznik **ROBOT / SIMULATION** wybiera, gdzie działają programy i ręczne
-  sterowanie.
+  sterowanie. Na starcie jest SIMULATION, po podłączeniu robota przełącza się na ROBOT, a po
+  rozłączeniu z powrotem; ręczne przełączenie na ROBOT bez robota wymaga potwierdzenia.
 - **Robot:** *Connect robot*, *Home*, **Pause / Resume** (zatrzymuje robota w trakcie ruchu
   i wznawia ruch) oraz czerwony **STOP** (od razu kończy program i ruch; ręczne sterowanie,
   Home i Run działają zaraz po nim).

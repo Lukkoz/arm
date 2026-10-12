@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import QCursor, QPixmap, QIcon, QDoubleValidator, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QFont, QDesktopServices
 from PyQt5.QtCore import Qt, QRegularExpression, QUrl, pyqtSignal, QTimer
-from PyQt5.QtWidgets import QButtonGroup, QRadioButton, QPushButton, QCheckBox, QVBoxLayout, QSizePolicy, QSpacerItem, QFileDialog, QFrame, QGridLayout, QTextEdit, QScrollBar, QLineEdit, QWidget
+from PyQt5.QtWidgets import QButtonGroup, QRadioButton, QPushButton, QCheckBox, QVBoxLayout, QSizePolicy, QSpacerItem, QFileDialog, QFrame, QGridLayout, QTextEdit, QScrollBar, QLineEdit, QWidget, QMessageBox
 
 from backend.file_managment.file_management import FileManagement
 
@@ -152,6 +152,9 @@ class MenuField(QFrame):
         self.ModeToggle.setToolTip("Click to switch between the robot and the simulation")
         self.UpdateModeText(False)
         layout.addWidget(self.ModeToggle)
+        self.mode_switch_by_app = False
+        # no robot connected at start: simulation (once the window is up, so the labels exist)
+        QTimer.singleShot(0, lambda: self.SetMode(simulation=True))
         
         button = QPushButton("Add origin")
         button.setFixedSize(130, 25)
@@ -169,8 +172,39 @@ class MenuField(QFrame):
         stop_script()   
    
     def EnableSimulation(self, simulation):
+        if not simulation and not self.mode_switch_by_app and not connect_robot_check():
+            if not self.AskSwitchToRobot():
+                self.SetMode(simulation=True)        # stay in simulation
+                return
         enable_simulation(2 if simulation else 0)    # 2 = Qt checked, as the old checkbox sent
         self.UpdateModeText(simulation)
+
+    def AskSwitchToRobot(self):
+        """Warning before ROBOT mode without a connected robot; True = switch anyway."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("No robot connected")
+        box.setText("<b>No robot is connected.</b>")
+        box.setInformativeText("In ROBOT mode programs, jogging and Home do nothing until a robot "
+                               "is connected (Connect robot).\n\nSwitch to ROBOT anyway?")
+        to_robot = box.addButton("Switch to ROBOT", QMessageBox.YesRole)
+        stay = box.addButton("Stay in SIMULATION", QMessageBox.NoRole)
+        for button, color in ((to_robot, "#2e7d32"), (stay, "#1565c0")):
+            button.setMinimumSize(180, 40)
+            button.setStyleSheet(style_button_dialog % color)
+        box.setDefaultButton(stay)
+        box.setEscapeButton(stay)
+        box.exec_()
+        return box.clickedButton() == to_robot
+
+    # switch without asking: at start (simulation), on robot connect (robot) / disconnect (simulation)
+    def SetMode(self, simulation):
+        self.mode_switch_by_app = True
+        if self.ModeToggle.isChecked() == simulation:
+            self.EnableSimulation(simulation)
+        else:
+            self.ModeToggle.setChecked(simulation)   # calls EnableSimulation through toggled
+        self.mode_switch_by_app = False
 
     def UpdateModeText(self, simulation):
         self.ModeToggle.setText("SIMULATION" if simulation else "ROBOT")
@@ -272,6 +306,7 @@ class MenuField(QFrame):
             self.connect_robot_window.close()
         else:
             self.button_connect_robot.setStyleSheet(style_button_menu)
+        self.SetMode(simulation=not connect)         # robot connected: ROBOT, else SIMULATION
 
     def ButtonConnectIOColor(self, connect):
         if connect:

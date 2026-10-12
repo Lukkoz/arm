@@ -47,9 +47,11 @@ before connecting.
 
 ## Try it without a robot
 
-Click the big **ROBOT** button under *Mode* so it shows **SIMULATION** (blue): the jog buttons
-then move the 3D model instead of the robot, and the green **Run** button next to the program
-runs the program on the model. Click it again to switch back to **ROBOT** (green).
+Without a robot the program starts in **SIMULATION** mode (the big blue button under *Mode*):
+the jog buttons move the 3D model, and the green **Run** button next to the program runs the
+program on the model. When a robot connects, the mode switches to **ROBOT** (green) by itself,
+and back to SIMULATION when it disconnects. Click the button to switch by hand; switching to
+ROBOT without a connected robot asks first.
 
 ## Programming
 

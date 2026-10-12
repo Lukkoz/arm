@@ -679,3 +679,23 @@ style_button_run = ("""
                 border: 2px solid black;
             }
             """)
+
+# Big buttons in dialogs; %s = background colour
+style_button_dialog = ("""
+            QPushButton {
+                background-color: %s;
+                color: white;
+                border: 0px;
+                border-radius: 5px;
+                font-size: 15px;
+                font-weight: bold;
+                font-family: "Segoe UI";
+                padding: 6px 14px;
+            }
+            QPushButton:hover {
+                border: 2px solid black;
+            }
+            QPushButton:default {
+                border: 3px solid black;
+            }
+            """)

@@ -191,6 +191,8 @@ G28
 - **Jog Axis:** moves the tip along X, Y, Z (needs Home).
 - **Tool:** opens / closes the gripper.
 - **Mode:** the big **ROBOT / SIMULATION** toggle chooses where programs and jog buttons act.
+  It starts in SIMULATION, switches to ROBOT when a robot connects and back when it
+  disconnects; switching to ROBOT by hand without a robot asks first.
 - **Robot:** *Connect robot*, *Home*, **Pause / Resume** (holds the robot in the middle of a
   move and continues it) and the red **STOP** (ends the program and the move at once; jog,
   Home and Run work again right after it).

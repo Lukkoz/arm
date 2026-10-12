@@ -3,7 +3,8 @@
 ; packaging\build.ps1 does both and passes BuildDir / OutDir (the release folder outside the repo).
 
 #define AppName "MiKoBots Studio ARM"
-#define AppVersion "1.15-arm"
+; release version of this repository (the app itself is based on MiKoBots Studio V1.15)
+#define AppVersion "0.2.0"
 #define AppExe "MiKoBots Studio.exe"
 #ifndef BuildDir
   #define BuildDir "..\..\..\release\dist\MiKoBots Studio"
